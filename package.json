@@ -1,0 +1,94 @@
+{
+  "name": "stock-desk",
+  "version": "1.9.3",
+  "description": "A股桌面盯盘 v1.9.3 — 北交所完整行情、多源研报与切股同步修复",
+  "type": "module",
+  "main": "main.js",
+  "author": "Thincn",
+  "license": "MIT",
+  "scripts": {
+    "prestart": "node scripts/ensure-deps.mjs",
+    "start": "electron .",
+    "predev": "node scripts/ensure-deps.mjs",
+    "dev": "electron . --dev",
+    "prepack": "node scripts/ensure-deps.mjs --builder",
+    "pack": "electron-builder --dir",
+    "predist": "node scripts/ensure-deps.mjs --builder",
+    "dist": "electron-builder --win",
+    "predist:portable": "node scripts/ensure-deps.mjs --builder",
+    "dist:portable": "electron-builder --win portable",
+    "check": "node scripts/unit-check.mjs",
+    "test:regression": "node scripts/regression-check.mjs",
+    "test:security": "node scripts/security-check.mjs",
+    "test:llm": "node scripts/llm-adapter-check.mjs",
+    "test:performance": "node scripts/performance-smoke.mjs",
+    "test:network": "node scripts/network-check.mjs",
+    "test:release": "node scripts/release-gate.mjs",
+    "test:ui": "node scripts/ui-contract-check.mjs",
+    "test:monitor": "node scripts/monitor-check.mjs",
+    "test:screener": "node scripts/screener-check.mjs",
+    "test:global": "node scripts/global-context-check.mjs",
+    "test:research-agent": "node scripts/research-agent-check.mjs",
+    "test:local-ai": "node scripts/local-ai-check.mjs",
+    "test:data-sources": "node scripts/data-provider-check.mjs",
+    "test:market-coverage": "node scripts/market-coverage-network-smoke.mjs"
+  },
+  "devDependencies": {
+    "electron": "^38.0.0",
+    "electron-builder": "^26.0.0"
+  },
+  "build": {
+    "appId": "com.stockdesk.app",
+    "productName": "StockDesk盯盘",
+    "directories": {
+      "output": "build/dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "engine/**/*",
+      "renderer/**/*",
+      "!renderer/assets/*.psd",
+      "python-ai/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "LICENSE",
+        "to": "LICENSE"
+      },
+      {
+        "from": "THIRD_PARTY_NOTICES.md",
+        "to": "THIRD_PARTY_NOTICES.md"
+      }
+    ],
+    "asar": true,
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "renderer/assets/icon.png"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "StockDesk 盯盘"
+    },
+    "asarUnpack": [
+      "python-ai/**/*"
+    ]
+  }
+}

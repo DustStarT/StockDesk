@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' data:;">
+  <title>StockDesk 盯盘</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="app">
+    <!-- 顶部栏 -->
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-logo">📈</span>
+        <span class="brand-name">StockDesk</span>
+        <span class="brand-sub">A股盯盘</span>
+      </div>
+      <div class="market-status" id="market-status">
+        <span class="status-dot"></span><span id="market-status-text">连接中…</span>
+      </div>
+      <div class="topbar-right">
+        <button class="icon-btn" id="btn-refresh" title="立即刷新">⟳</button>
+        <button class="icon-btn monitor-bell" id="btn-monitor" title="策略监控与提醒">🔔<span id="monitor-badge" class="monitor-badge" hidden>0</span></button>
+        <button class="icon-btn" id="btn-theme" title="切换主题">🌙</button>
+        <button class="icon-btn" id="btn-ai-settings" title="AI 模型设置">🤖</button>
+        <button class="icon-btn" id="btn-settings" title="设置">⚙</button>
+        <div class="win-controls">
+          <button class="win-btn" id="btn-min" title="最小化">─</button>
+          <button class="win-btn" id="btn-max" title="最大化">□</button>
+          <button class="win-btn win-close" id="btn-close" title="关闭">×</button>
+        </div>
+      </div>
+    </header>
+
+    <!-- 主体三栏 -->
+    <div class="main">
+      <!-- 左侧：自选股 -->
+      <aside class="sidebar">
+        <div class="sidebar-head">
+          <span>自选股</span>
+          <button class="mini-btn" id="btn-add" title="添加股票">＋</button>
+        </div>
+        <div class="group-tabs" id="group-tabs"></div>
+        <div class="watch-list" id="watch-list"></div>
+        <div class="sidebar-foot">
+          <button class="mini-btn" id="btn-new-group">＋ 新分组</button>
+        </div>
+      </aside>
+
+      <!-- 中间：图表区 -->
+      <section class="center">
+        <div class="stock-head" id="stock-head">
+          <div class="stock-title">
+            <span class="stock-name" id="detail-name">—</span>
+            <span class="stock-code" id="detail-code"></span>
+          </div>
+          <div class="stock-price-line">
+            <span class="stock-price" id="detail-price">--</span>
+            <span class="stock-chg" id="detail-chg">--</span>
+            <span class="stock-trigger" id="detail-trigger"></span>
+          </div>
+        </div>
+        <div class="chart-tabs" id="chart-tabs">
+          <button data-period="day" class="active">日K</button>
+          <button data-period="week">周K</button>
+          <button data-period="month">月K</button>
+          <button data-period="minute">分时</button>
+        </div>
+        <div class="indicator-toolbar" id="indicator-toolbar">
+          <span class="indicator-label">技术副图</span>
+          <label>布局
+            <select id="indicator-layout">
+              <option value="0">隐藏</option><option value="1" selected>1屏</option><option value="2">2屏</option><option value="3">3屏</option>
+            </select>
+          </label>
+          <label>A <select id="indicator-a"></select></label>
+          <label class="indicator-slot slot-b" hidden>B <select id="indicator-b"></select></label>
+          <label class="indicator-slot slot-c" hidden>C <select id="indicator-c"></select></label>
+          <button class="mini-btn indicator-param-btn" id="indicator-params" title="配置技术指标参数">⚙ 参数</button>
+          <span class="indicator-note" id="indicator-note">日/周/月K支持副图</span>
+        </div>
+        <div class="chart-stack" id="chart-stack">
+          <div class="chart-wrap" id="main-chart-wrap">
+            <canvas id="chart"></canvas>
+            <div class="chart-empty" id="chart-empty" hidden>选择一只股票查看走势</div>
+          </div>
+          <div class="indicator-grid" id="indicator-grid"></div>
+        </div>
+        <!-- 信号摘要 -->
+        <div class="signal-strip" id="signal-strip"></div>
+      </section>
+
+      <!-- 右侧：功能面板 -->
+      <aside class="right-panel">
+        <div class="panel-tabs" id="panel-tabs">
+          <button data-panel="signal" class="active">信号</button>
+          <button data-panel="screen">选股</button>
+          <button data-panel="strategy">策略</button>
+          <button data-panel="report">研报</button>
+        </div>
+        <div class="panel-body" id="panel-body"></div>
+      </aside>
+    </div>
+
+    <!-- 底部状态栏 -->
+    <footer class="statusbar">
+      <span id="status-msg">就绪</span>
+      <span class="flex-1"></span>
+      <span id="status-clock"></span>
+    </footer>
+
+    <!-- 添加股票弹窗 -->
+    <div class="modal-mask" id="add-modal" hidden>
+      <div class="modal">
+        <div class="modal-head">添加股票 <button class="modal-close" id="add-close">×</button></div>
+        <input class="modal-input" id="add-input" placeholder="输入代码或名称，如 600519 / 贵州茅台" autofocus>
+        <div class="modal-results" id="add-results"></div>
+        <div class="modal-foot">
+          <label class="chk-inline">买入目标价 <input type="number" id="add-buy" step="0.01" min="0"></label>
+          <label class="chk-inline">卖出目标价 <input type="number" id="add-sell" step="0.01" min="0"></label>
+          <span class="flex-1"></span>
+          <button class="btn" id="add-confirm">添加</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 设置弹窗（fixed 定位，避免 z-index 穿透） -->
+    <div class="settings-pop" id="settings-pop" hidden>
+      <label>刷新间隔
+        <select id="set-poll">
+          <option value="2000">2 秒</option>
+          <option value="5000" selected>5 秒</option>
+          <option value="10000">10 秒</option>
+          <option value="30000">30 秒</option>
+          <option value="60000">60 秒</option>
+        </select>
+      </label>
+      <label class="chk"><input type="checkbox" id="set-alerts" checked> 目标价提醒</label>
+      <label class="chk"><input type="checkbox" id="set-monitor-enabled" checked> 后台策略监控</label>
+      <label class="chk"><input type="checkbox" id="set-strategy-alerts" checked> 策略系统通知</label>
+      <label>监控间隔
+        <select id="set-monitor-poll"><option value="10000">10 秒</option><option value="15000" selected>15 秒</option><option value="30000">30 秒</option><option value="60000">60 秒</option></select>
+      </label>
+      <label>提醒冷却
+        <select id="set-monitor-cooldown"><option value="5">5 分钟</option><option value="15">15 分钟</option><option value="30" selected>30 分钟</option><option value="60">60 分钟</option><option value="120">120 分钟</option></select>
+      </label>
+      <label class="chk"><input type="checkbox" id="set-market-hours" checked> 仅A股交易时段主动提醒</label>
+      <label class="chk"><input type="checkbox" id="set-close-tray" checked> 点击关闭按钮时最小化到托盘</label>
+      <label class="chk"><input type="checkbox" id="set-pause-hidden" checked> 隐藏时暂停界面刷新（策略监控继续）</label>
+      <button class="btn ghost settings-wide-btn" id="data-source-open">数据源管理 · 多源轮换/限速</button>
+      <label class="range-label">毛玻璃透明度
+        <input type="range" id="set-opacity" min="30" max="95" step="1">
+        <span class="range-val" id="set-opacity-val">72%</span>
+      </label>
+    </div>
+
+    <!-- v1.9.2 多数据源管理 -->
+    <div class="modal-mask" id="data-source-modal" hidden>
+      <div class="modal data-source-modal">
+        <div class="modal-head">数据源管理 <button class="modal-close" id="data-source-close">×</button></div>
+        <div class="data-source-intro">行情由统一 Provider Hub 调度：优先使用批量请求，并在健康数据源间轮换；遇到 403/429/WAF 类响应会自动熔断冷却。该机制用于降低单源负载与合规故障回退，不用于绕过访问控制。</div>
+        <div class="data-source-toolbar">
+          <label>调度方式
+            <select id="data-source-routing"><option value="adaptive">自适应轮换（推荐）</option><option value="rotate">严格轮换</option><option value="priority">按优先级</option></select>
+          </label>
+          <label>缓存策略
+            <select id="data-source-cache"><option value="conservative">保守</option><option value="balanced">平衡（推荐）</option><option value="aggressive">积极降频</option></select>
+          </label>
+          <label class="chk"><input type="checkbox" id="data-source-stale" checked> 全源失败时允许显示最近缓存并标记“陈旧”</label>
+        </div>
+        <div class="data-source-section-title">内置公开数据源</div>
+        <div id="data-source-builtins" class="data-source-list"></div>
+        <div class="data-source-section-title">自定义 / 付费 REST 数据源（高级）</div>
+        <div class="note">可添加 quote / kline / minute 的 GET/POST REST 映射；不执行用户 JavaScript。URL/Headers/Body 可使用 {code}、{symbol}、{market}、{secid}、{period}、{count}、{symbols}、{codes}、{secret} 占位符。报价接口支持 batch:true，一次发送整个股票池。密钥单独使用系统安全存储保存。</div>
+        <textarea id="data-source-custom-json" class="data-source-json" spellcheck="false" placeholder='[{"id":"myfeed","label":"我的数据源","enabled":true,"capabilities":["quote"],"minIntervalMs":5000,"quote":{"method":"GET","batch":true,"url":"https://api.example.com/quotes?symbols={symbols}","headers":{"Authorization":"Bearer {secret}"},"root":"data","map":{"code":"code","name":"name","price":"last","prevClose":"prev_close","high":"high","low":"low","volume":"volume","amount":"amount"}}}]'></textarea>
+        <div class="data-source-secret-row">
+          <input id="data-source-secret-id" placeholder="自定义数据源 ID，例如 myfeed">
+          <input id="data-source-secret" type="password" placeholder="Token / API Key（留空=清除）">
+          <button class="btn ghost" id="data-source-save-secret">保存密钥</button>
+        </div>
+        <div class="data-source-actions">
+          <input id="data-source-test-code" value="sh600519" placeholder="测试代码">
+          <button class="btn ghost" id="data-source-reset-breakers">解除熔断</button>
+          <button class="btn ghost" id="data-source-test">测试数据源</button>
+          <span class="flex-1"></span>
+          <button class="btn" id="data-source-save">保存配置</button>
+        </div>
+        <div id="data-source-status" class="data-source-status"></div>
+      </div>
+    </div>
+
+
+    <!-- v1.6 策略监控 / 提醒中心 -->
+    <div class="modal-mask" id="monitor-modal" hidden>
+      <div class="modal monitor-modal">
+        <div class="modal-head">策略监控与提醒 <button class="modal-close" id="monitor-close">×</button></div>
+        <div class="monitor-summary" id="monitor-summary"></div>
+        <div class="monitor-toolbar">
+          <button class="btn" id="monitor-check-now">立即检查</button>
+          <button class="btn ghost" id="monitor-read-all">全部已读</button>
+          <button class="btn ghost" id="monitor-clear-alerts">清空历史</button>
+        </div>
+        <div class="monitor-section-title">正在监控</div>
+        <div class="monitor-list" id="monitor-list"></div>
+        <div class="monitor-section-title">最近提醒</div>
+        <div class="monitor-alert-list" id="monitor-alert-list"></div>
+        <div class="note">策略监控是研究/提醒功能，不会自动下单。窗口隐藏后监控仍可继续；只有界面行情刷新可暂停。A股交易时段判断按北京时间工作日常规时段，法定休市日以行情源是否更新为准。</div>
+      </div>
+    </div>
+
+    <!-- v1.6 记录持仓 -->
+    <div class="modal-mask" id="position-modal" hidden>
+      <div class="modal position-modal">
+        <div class="modal-head">记录持仓 <button class="modal-close" id="position-close">×</button></div>
+        <div class="position-form">
+          <label>股票 <b id="position-stock">—</b></label>
+          <label>成本价 <input type="number" id="position-price" min="0" step="0.01" placeholder="例如 31.52"></label>
+          <label>买入日期 <input type="date" id="position-date"></label>
+        </div>
+        <div class="note">用于止损、止盈、移动止损和最长持有期提醒；StockDesk 不会据此执行交易。</div>
+        <div class="modal-foot"><button class="btn ghost" id="position-clear">清除持仓</button><span class="flex-1"></span><button class="btn primary" id="position-save">保存持仓</button></div>
+      </div>
+    </div>
+
+    <!-- v1.3.2 技术指标参数设置 -->
+    <div class="modal-mask" id="indicator-param-modal" hidden>
+      <div class="modal indicator-param-modal">
+        <div class="modal-head">技术指标参数 <button class="modal-close" id="indicator-param-close">×</button></div>
+        <div class="indicator-param-top">
+          <label>指标<select id="indicator-param-id"></select></label>
+          <span class="note" id="indicator-param-group"></span>
+        </div>
+        <div class="indicator-param-form" id="indicator-param-form"></div>
+        <div class="note">参数修改会同时影响副图计算、扩展技术指标评分、综合研报与发送给 LLM 的技术证据。为避免同源指标重复计票，22 类指标会先按趋势/动量/量价等因子族聚合。</div>
+        <div class="modal-foot">
+          <button class="btn ghost" id="indicator-param-reset">恢复当前指标默认值</button>
+          <button class="btn ghost" id="indicator-param-reset-all">全部恢复默认</button>
+          <span class="flex-1"></span>
+          <button class="btn primary" id="indicator-param-save">保存并重算</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- v1.3 AI 模型设置：Key 只发送给主进程，渲染进程永不读取已保存明文 -->
+    <div class="modal-mask" id="llm-modal" hidden>
+      <div class="modal llm-modal">
+        <div class="modal-head">AI 模型服务 <button class="modal-close" id="llm-close">×</button></div>
+        <div class="llm-status" id="llm-status">读取配置中…</div>
+        <div class="llm-form">
+          <label>服务商<select id="llm-provider"></select></label>
+          <label>API Endpoint<input id="llm-endpoint" placeholder="https://api.example.com/v1"></label>
+          <label>模型<input id="llm-model" placeholder="模型 ID"></label>
+          <label>API Key<input id="llm-key" type="password" autocomplete="off" placeholder="留空=继续使用已保存 Key"></label>
+          <label>计费方式<select id="llm-billing"><option value="payg">按量付费</option><option value="monthly">月付/套餐</option><option value="free">免费额度</option><option value="unknown">未知</option></select></label>
+          <label>温度<input id="llm-temperature" type="number" min="0" max="1" step="0.1"></label>
+          <label>DeepSeek 思考模式<select id="llm-thinking"><option value="low">低（推荐）</option><option value="auto">自动（服务商默认）</option><option value="disabled">关闭</option><option value="high">高</option><option value="max">最大</option></select></label>
+          <label class="chk llm-wide"><input type="checkbox" id="llm-web-research"> 启用 LLM 自主外部研究 Agent</label>
+          <label>研究深度<select id="llm-research-mode"><option value="fast">快速 · 盘中</option><option value="standard">标准 · 推荐</option><option value="deep">深度 · 收盘后</option></select></label>
+          <label class="chk"><input type="checkbox" id="llm-web-pages"> 允许 Agent 按需读取网页正文</label>
+          <div class="note llm-wide">研究预算：快速≈2轮/4查询；标准≈3轮/10查询；深度≈5轮/20查询。Agent 可提前判断证据充分并主动停止，不会为了用完预算而强行搜索。</div>
+          <label class="chk llm-manual-row"><input type="checkbox" id="llm-manual-pricing"> 手工覆盖 token 单价</label>
+          <label>输入 $ / 1M<input id="llm-price-in" type="number" min="0" step="0.001" placeholder="自动识别"></label>
+          <label>输出 $ / 1M<input id="llm-price-out" type="number" min="0" step="0.001" placeholder="自动识别"></label>
+        </div>
+        <div class="llm-price-hint" id="llm-price-hint"></div>
+        <div class="modal-foot llm-actions">
+          <button class="btn ghost" id="llm-clear-key">清除 Key</button>
+          <span class="flex-1"></span>
+          <button class="btn" id="llm-test">测试连接</button>
+          <button class="btn primary" id="llm-save">保存</button>
+        </div>
+        <div class="note">安全：已保存 Key 不会回传到网页渲染层；Windows 下优先使用 Electron/系统安全存储加密。资讯文本按“不可信数据”隔离后再送入模型。正式研报不再由 StockDesk 设置最大输出 token，上限由模型/服务商自身能力决定。DeepSeek 若出现“只有推理、没有最终正文”，会自动关闭思考模式重试。外部研究由 LLM Research Agent 自主决定查什么、用什么语言、是否读取网页、是否继续追查和何时停止；程序只提供搜索/安全读取工具与硬预算。所有联网内容始终按“不可信外部数据”隔离，并保存完整研究日志。</div>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

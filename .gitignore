@@ -1,0 +1,44 @@
+# ── 依赖 ──────────────────────────────────────────────────────────────
+node_modules/
+
+# ── 构建产物（electron-builder 输出，见 package.json build.directories.output）
+build/
+dist/
+out/
+
+# ── 运行时产物 ────────────────────────────────────────────────────────
+# engine/llm-service.js 会把每次 LLM 调用的原始响应、reasoning 与输入快照写到这里
+llm_raw_outputs/
+
+# Python sidecar 字节码与虚拟环境
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# 报告导出的中间文件
+~$*.docx
+
+# ── 本地状态 / 日志 ───────────────────────────────────────────────────
+# 注意：应用真正的状态目录是 ~/.stockdesk/，不在仓库内。
+# 以下是开发过程中可能落到仓库根目录的临时文件。
+*.log
+*.tmp
+*.bak
+*.old
+.cache/
+
+# ── 编辑器 / 操作系统 ─────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── 打包产物 ──────────────────────────────────────────────────────────
+*.blockmap
+*.nsis.7z
+*.AppImage
